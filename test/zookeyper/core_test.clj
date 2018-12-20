@@ -24,7 +24,7 @@
               (zk/create client root :persistent? true)
               (f client)))
           (finally
-            (zk/delete client root)
+            (zk/delete-all client root)
             (zk/close client)))))
 
 (deftest zookeeper-exists
@@ -34,3 +34,12 @@
 (deftest zookeeper-not-exists
   (is (not (with-zookeeper "127.0.0.1" "/test"
         (fn [client] (zk/exists client "/foo"))))))
+
+(deftest create-update-get-delete
+  (with-zookeeper "127.0.0.1" "/test"
+    (fn [client]
+      (is (create-val client "/test/one" "un"))
+      (is (= (get-val client "/test/one") "un"))
+      (is (update-val client "/test/one" "uno"))
+      (is (= (get-val client "/test/one") "uno"))
+      (is (delete-val client "/test/one")))))

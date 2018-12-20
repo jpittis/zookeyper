@@ -2,10 +2,12 @@
   (:require [ring.adapter.jetty :as jetty]
             [compojure.core :refer [defroutes GET]]
             [compojure.route :refer [not-found]]
-            [zookeeper :as zk])
+            [zookeeper :as zk]
+            [zookeeper.data :as data])
   (:gen-class))
 
-(defn handler [request]
+(defn handler
+  [request]
   {:status 200
    :headers {"Content-Type" "text/html"}
    :body "Hello there!"})
@@ -14,12 +16,30 @@
   (GET "/" [] handler)
   (not-found "404 not found"))
 
+(declare zk-client)
+
+(def root-path "/zookeyper/")
+
 (defn -main
-  [port]
-  (jetty/run-jetty routes {:port (Integer. port)}))
+  [port hosts]
+  (def zk-client (zk/connect hosts))
+  (try
+    (when-not (zk/exists zk-client root-path) (zk/create zk-client root-path))
+    (jetty/run-jetty routes {:port (Integer. port)})
+    (finally (zk/close zk-client))))
 
-;; Zookeeper scratchpad.
+(defn create-val
+  [client k v]
+  (zk/create client k :persistent? true :data (.getBytes v "UTF-8")))
 
-; (def client [hosts] (zk/connect hosts))
+(defn update-val
+  [client k v]
+  (zk/set-data client k (.getBytes v "UTF-8") -1))
 
-; (zk/close client)
+(defn get-val
+  [client k]
+  (data/to-string (:data (zk/data client k))))
+
+(defn delete-val
+  [client k]
+  (zk/delete client k))
