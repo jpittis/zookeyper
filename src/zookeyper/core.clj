@@ -1,32 +1,57 @@
 (ns zookeyper.core
   (:require [ring.adapter.jetty :as jetty]
-            [compojure.core :refer [defroutes GET]]
+            [compojure.core :refer [GET POST DELETE PUT]]
             [compojure.route :refer [not-found]]
             [zookeeper :as zk]
             [zookeeper.data :as data])
   (:gen-class))
 
-(defn handler
-  [request]
-  {:status 200
-   :headers {"Content-Type" "text/html"}
-   :body "Hello there!"})
+(defn create-handler
+  [state]
+  (fn [request]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body "Create!"}))
 
-(defroutes routes
-  (GET "/" [] handler)
-  (not-found "404 not found"))
+(defn update-handler
+  [state]
+  (fn [request]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body "Update!"}))
 
-(declare zk-client)
+(defn delete-handler
+  [state]
+  (fn [request]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body "Delete!"}))
 
-(def root-path "/zookeyper/")
+(defn get-handler
+  [state]
+  (fn [request]
+    {:status 200
+     :headers {"Content-Type" "text/html"}
+     :body "Get!"}))
+
+(defn routes [state]
+  (compojure.core/routes
+    (GET    "/store" [] (get-handler    state))
+    (POST   "/store" [] (create-handler state))
+    (DELETE "/store" [] (delete-handler state))
+    (PUT    "/store" [] (update-handler state))))
+
+(defn connect
+  [hosts & {:keys [root], :or {root "/zookeyper"}}]
+  (let [client (zk/connect hosts)]
+    (when-not (zk/exists client root) (zk/create client root))
+    {:client client
+     :root root}))
 
 (defn -main
   [port hosts]
-  (def zk-client (zk/connect hosts))
-  (try
-    (when-not (zk/exists zk-client root-path) (zk/create zk-client root-path))
-    (jetty/run-jetty routes {:port (Integer. port)})
-    (finally (zk/close zk-client))))
+  (println "Listening...")
+  (jetty/run-jetty (routes (connect hosts)) {:port (Integer. port)}))
 
 (defn create-val
   [client k v]

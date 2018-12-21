@@ -4,11 +4,29 @@
             [ring.mock.request :as mock]
             [zookeeper :as zk]))
 
-(deftest routes-return-hello
-  (is (= (routes (mock/request :get "/"))
+(deftest store-get
+  (is (= ((routes nil) (mock/request :get "/store"))
          {:status 200
           :headers {"Content-Type" "text/html"}
-          :body "Hello there!"})))
+          :body "Get!"})))
+
+(deftest store-delete
+  (is (= ((routes nil) (mock/request :delete "/store"))
+         {:status 200
+          :headers {"Content-Type" "text/html"}
+          :body "Delete!"})))
+
+(deftest store-create
+  (is (= ((routes nil) (mock/request :post "/store"))
+         {:status 200
+          :headers {"Content-Type" "text/html"}
+          :body "Create!"})))
+
+(deftest store-create
+  (is (= ((routes nil) (mock/request :put "/store"))
+         {:status 200
+          :headers {"Content-Type" "text/html"}
+          :body "Update!"})))
 
 ;; Zookeeper scratchpad.
 
