@@ -2,6 +2,8 @@
   (:require [ring.adapter.jetty :as jetty]
             [compojure.core :refer [GET POST DELETE PUT]]
             [compojure.route :refer [not-found]]
+            [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
+            [ring.util.response :refer [response]]
             [zookeeper :as zk]
             [zookeeper.data :as data])
   (:gen-class))
@@ -9,30 +11,22 @@
 (defn create-handler
   [state]
   (fn [request]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :body "Create!"}))
+    (response (:body request))))
 
 (defn update-handler
   [state]
   (fn [request]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :body "Update!"}))
+    (response (:body request))))
 
 (defn delete-handler
   [state]
   (fn [request]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :body "Delete!"}))
+    (response (:body request))))
 
 (defn get-handler
   [state]
   (fn [request]
-    {:status 200
-     :headers {"Content-Type" "text/html"}
-     :body "Get!"}))
+    (response (:body request))))
 
 (defn routes [state]
   (compojure.core/routes
@@ -40,6 +34,11 @@
     (POST   "/store" [] (create-handler state))
     (DELETE "/store" [] (delete-handler state))
     (PUT    "/store" [] (update-handler state))))
+
+(defn app [state]
+  (-> (routes state)
+      wrap-json-response
+      wrap-json-body))
 
 (defn connect
   [hosts & {:keys [root], :or {root "/zookeyper"}}]

@@ -2,31 +2,36 @@
   (:require [clojure.test :refer :all]
             [zookeyper.core :refer :all]
             [ring.mock.request :as mock]
-            [zookeeper :as zk]))
+            [zookeeper :as zk]
+            [clojure.data.json :as json]))
 
 (deftest store-get
-  (is (= ((routes nil) (mock/request :get "/store"))
+  (is (= ((app nil) (-> (mock/request :get "/store")
+                        (mock/json-body {:key "foo"})))
          {:status 200
-          :headers {"Content-Type" "text/html"}
-          :body "Get!"})))
+          :headers {"Content-Type" "application/json; charset=utf-8"}
+          :body (json/write-str {:key "foo"})})))
 
 (deftest store-delete
-  (is (= ((routes nil) (mock/request :delete "/store"))
+  (is (= ((app nil) (-> (mock/request :delete "/store")
+                        (mock/json-body {:key "foo"})))
          {:status 200
-          :headers {"Content-Type" "text/html"}
-          :body "Delete!"})))
+          :headers {"Content-Type" "application/json; charset=utf-8"}
+          :body (json/write-str {:key "foo"})})))
 
 (deftest store-create
-  (is (= ((routes nil) (mock/request :post "/store"))
+  (is (= ((app nil) (-> (mock/request :post "/store")
+                        (mock/json-body {:key "foo" :val "bar"})))
          {:status 200
-          :headers {"Content-Type" "text/html"}
-          :body "Create!"})))
+          :headers {"Content-Type" "application/json; charset=utf-8"}
+          :body (json/write-str {:key "foo" :val "bar"})})))
 
-(deftest store-create
-  (is (= ((routes nil) (mock/request :put "/store"))
+(deftest store-update
+  (is (= ((app nil) (-> (mock/request :put "/store")
+                        (mock/json-body {:key "foo" :val "bar"})))
          {:status 200
-          :headers {"Content-Type" "text/html"}
-          :body "Update!"})))
+          :headers {"Content-Type" "application/json; charset=utf-8"}
+          :body (json/write-str {:key "foo" :val "bar"})})))
 
 ;; Zookeeper scratchpad.
 
