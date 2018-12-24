@@ -39,6 +39,15 @@
               :headers {"Content-Type" "application/json; charset=utf-8"}
               :body (json/write-str {:val "bar"})})))))
 
+(deftest store-get-not-found
+  (with-zookeeper-state "127.0.0.1" "/test"
+    (fn [state]
+      (is (= ((app state) (-> (mock/request :get "/store")
+                              (mock/json-body {:key "foo"})))
+             {:status 200
+              :headers {"Content-Type" "text/html; charset=utf-8"}
+              :body "KeeperErrorCode = NoNode for /test/foo"})))))
+
 (deftest store-delete
   (is (= ((app nil) (-> (mock/request :delete "/store")
                         (mock/json-body {:key "foo"})))

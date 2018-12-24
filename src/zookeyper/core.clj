@@ -42,9 +42,11 @@
 (defn get-handler
   [state]
   (fn [request]
-    (let [k (str (:root state) "/" ((:body request) "key"))
-          v (get-val (:client state) k)]
-      (response {:val v}))))
+    (try
+      (let [k (str (:root state) "/" ((:body request) "key"))
+            v (get-val (:client state) k)]
+        (response {:val v}))
+      (catch Exception e (.getMessage e)))))
 
 (defn routes [state]
   (compojure.core/routes
