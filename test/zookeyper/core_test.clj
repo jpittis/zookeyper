@@ -29,8 +29,13 @@
       (let [state {:client client :root root}]
         (f state)))))
 
+(defn with-zookeeper-test
+  "Just like with-zookeeper-state but uses the local test zookeeper and the /test root."
+  [f]
+  (with-zookeeper-state "127.0.0.1" "/test" f))
+
 (deftest store-get-found
-  (with-zookeeper-state "127.0.0.1" "/test"
+  (with-zookeeper-test
     (fn [state]
       (create-val (:client state) "/test/foo" "bar")
       (is (= ((app state) (-> (mock/request :get "/store")
@@ -40,7 +45,7 @@
               :body (json/write-str {:val "bar"})})))))
 
 (deftest store-get-not-found
-  (with-zookeeper-state "127.0.0.1" "/test"
+  (with-zookeeper-test
     (fn [state]
       (is (= ((app state) (-> (mock/request :get "/store")
                               (mock/json-body {:key "foo"})))
