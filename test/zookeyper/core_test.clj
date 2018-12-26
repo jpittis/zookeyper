@@ -3,7 +3,7 @@
             [zookeyper.core :refer :all]
             [ring.mock.request :as mock]
             [zookeeper :as zk]
-            [clojure.data.json :as json]))
+            [cheshire.core :as json]))
 
 (defn with-zookeeper
   "Connect to Zookeeper, run the function and then ensure the connection is closed. The
@@ -34,59 +34,45 @@
   [f]
   (with-zookeeper-state "127.0.0.1" "/test" f))
 
-(deftest store-get-found
+(defn mock-store-request [state method body]
+  ((app state) (-> (mock/request method "/store")
+                   (mock/json-body body))))
+
+(defn json-response [status body]
+  {:status status
+   :headers {"Content-Type" "application/json; charset=utf-8"}
+   :body (json/generate-string body)})
+
+(deftest store-get-key-found
   (with-zookeeper-test
     (fn [state]
-      (create-val (:client state) "/test/foo" "bar")
-      (is (= ((app state) (-> (mock/request :get "/store")
-                              (mock/json-body {:key "foo"})))
-             {:status 200
-              :headers {"Content-Type" "application/json; charset=utf-8"}
-              :body (json/write-str {:val "bar"})})))))
+      (create-val state "foo" "bar")
+      (is (= (json-response 200 {:val "bar"})
+             (mock-store-request state :get {:key "foo"}))))))
 
-(deftest store-get-not-found
+(deftest store-get-key-not-found
   (with-zookeeper-test
     (fn [state]
-      (is (= ((app state) (-> (mock/request :get "/store")
-                              (mock/json-body {:key "foo"})))
-             {:status 200
-              :headers {"Content-Type" "text/html; charset=utf-8"}
-              :body "KeeperErrorCode = NoNode for /test/foo"})))))
+      (is (= (json-response 404 {:error "KeeperErrorCode = NoNode for /test/foo"})
+             (mock-store-request state :get {:key "foo"}))))))
 
-(deftest store-delete
-  (is (= ((app nil) (-> (mock/request :delete "/store")
-                        (mock/json-body {:key "foo"})))
-         {:status 200
-          :headers {"Content-Type" "application/json; charset=utf-8"}
-          :body (json/write-str {:key "foo"})})))
+(deftest store-delete-found-and-then-not-found
+  (with-zookeeper-test
+    (fn [state]
+      (create-val state "foo" "bar")
+      (is (= (json-response 200 {})
+             (mock-store-request state :delete {:key "foo"})))
+      (is (= (json-response 200 {})
+             (mock-store-request state :delete {:key "foo"}))))))
 
-(deftest store-create
-  (is (= ((app nil) (-> (mock/request :post "/store")
-                        (mock/json-body {:key "foo" :val "bar"})))
-         {:status 200
-          :headers {"Content-Type" "application/json; charset=utf-8"}
-          :body (json/write-str {:key "foo" :val "bar"})})))
-
-(deftest store-update
-  (is (= ((app nil) (-> (mock/request :put "/store")
-                        (mock/json-body {:key "foo" :val "bar"})))
-         {:status 200
-          :headers {"Content-Type" "application/json; charset=utf-8"}
-          :body (json/write-str {:key "foo" :val "bar"})})))
-
-(deftest zookeeper-exists
-  (is (with-zookeeper "127.0.0.1" "/test"
-        (fn [client] (zk/exists client "/test")))))
-
-(deftest zookeeper-not-exists
-  (is (not (with-zookeeper "127.0.0.1" "/test"
-        (fn [client] (zk/exists client "/foo"))))))
-
-(deftest create-update-get-delete
-  (with-zookeeper "127.0.0.1" "/test"
-    (fn [client]
-      (is (create-val client "/test/one" "un"))
-      (is (= (get-val client "/test/one") "un"))
-      (is (update-val client "/test/one" "uno"))
-      (is (= (get-val client "/test/one") "uno"))
-      (is (delete-val client "/test/one")))))
+(deftest store-create-and-update
+  (with-zookeeper-test
+    (fn [state]
+      (is (= (json-response 200 {})
+             (mock-store-request state :post {:key "foo" :val "bar"})))
+      (is (= (json-response 200 {:val "bar"})
+             (mock-store-request state :get {:key "foo"})))
+      (is (= (json-response 200 {})
+             (mock-store-request state :put {:key "foo" :val "lol"})))
+      (is (= (json-response 200 {:val "lol"})
+             (mock-store-request state :get {:key "foo"}))))))

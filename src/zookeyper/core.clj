@@ -8,45 +8,73 @@
             [zookeeper.data :as data])
   (:gen-class))
 
+(defn namespace-key [state k] (str (:root state) "/" k))
+
 (defn create-val
-  [client k v]
-  (zk/create client k :persistent? true :data (.getBytes v "UTF-8")))
+  [state k v]
+  (let [namespaced-key (namespace-key state k)]
+    (zk/create (:client state) namespaced-key :persistent? true :data (.getBytes v "UTF-8"))))
 
 (defn update-val
-  [client k v]
-  (zk/set-data client k (.getBytes v "UTF-8") -1))
+  [state k v]
+  (let [namespaced-key (namespace-key state k)]
+    (zk/set-data (:client state) namespaced-key (.getBytes v "UTF-8") -1)))
 
 (defn get-val
-  [client k]
-  (data/to-string (:data (zk/data client k))))
+  [state k]
+  (let [namespaced-key (namespace-key state k)]
+    (data/to-string (:data (zk/data (:client state) namespaced-key)))))
 
 (defn delete-val
-  [client k]
-  (zk/delete client k))
+  [state k]
+  (let [namespaced-key (namespace-key state k)]
+    (zk/delete (:client state) namespaced-key)))
 
 (defn create-handler
   [state]
   (fn [request]
-    (response (:body request))))
+    (try
+      (let [k ((:body request) "key")
+            v ((:body request) "val")]
+        (do (create-val state k v)
+            (response {})))
+      (catch Exception e
+        (-> (response {:error (.getMessage e)})
+            (assoc :status 404))))))
 
 (defn update-handler
   [state]
   (fn [request]
-    (response (:body request))))
+    (try
+      (let [k ((:body request) "key")
+            v ((:body request) "val")]
+        (do (update-val state k v)
+            (response {})))
+      (catch Exception e
+        (-> (response {:error (.getMessage e)})
+            (assoc :status 404))))))
 
 (defn delete-handler
   [state]
   (fn [request]
-    (response (:body request))))
+    (try
+      (let [k ((:body request) "key")
+            v (delete-val state k)]
+        (response {}))
+      (catch Exception e
+        (-> (response {:error (.getMessage e)})
+            (assoc :status 404))))))
 
 (defn get-handler
   [state]
   (fn [request]
     (try
-      (let [k (str (:root state) "/" ((:body request) "key"))
-            v (get-val (:client state) k)]
+      (let [k ((:body request) "key")
+            v (get-val state k)]
         (response {:val v}))
-      (catch Exception e (.getMessage e)))))
+      (catch Exception e
+        (-> (response {:error (.getMessage e)})
+            (assoc :status 404))))))
 
 (defn routes [state]
   (compojure.core/routes
@@ -70,4 +98,4 @@
 (defn -main
   [port hosts]
   (println "Listening...")
-  (jetty/run-jetty (routes (connect hosts)) {:port (Integer. port)}))
+  (jetty/run-jetty (app (connect hosts)) {:port (Integer. port)}))
