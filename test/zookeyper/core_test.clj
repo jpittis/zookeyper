@@ -5,6 +5,8 @@
             [zookeeper :as zk]
             [cheshire.core :as json]))
 
+;; Test Helpers
+
 (defn with-zookeeper-state
   "Connect to Zookeeper, run the function and then ensure the connection is closed. The
   root znode will be created and then cleaned up after the function is run. This is
@@ -26,13 +28,17 @@
   (with-zookeeper-state "127.0.0.1" "/test" f))
 
 (defn mock-store-request [state method body]
+  "A test helper to run an JSON HTTP request against the app HTTP handler."
   ((app state) (-> (mock/request method "/store")
                    (mock/json-body body))))
 
 (defn json-response [status body]
+  "A test helper to build expected response bodies from the HTTP handlers."
   {:status status
    :headers {"Content-Type" "application/json; charset=utf-8"}
    :body (json/generate-string body)})
+
+;; App HTTP Handler Tests
 
 (deftest store-get-key-found
   (with-zookeeper-test
