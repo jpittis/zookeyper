@@ -3,32 +3,10 @@
             [compojure.core :refer [GET POST DELETE PUT]]
             [compojure.route :refer [not-found]]
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
-            [ring.util.response :refer [response]]
-            [zookeeper :as zk]
-            [zookeeper.data :as data])
+            [ring.util.response :refer [response]])
   (:gen-class))
 
-(defn namespace-key [state k] (str (:root state) "/" k))
-
-(defn create-val
-  [state k v]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/create (:client state) namespaced-key :persistent? true :data (.getBytes v "UTF-8"))))
-
-(defn update-val
-  [state k v]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/set-data (:client state) namespaced-key (.getBytes v "UTF-8") -1)))
-
-(defn get-val
-  [state k]
-  (let [namespaced-key (namespace-key state k)]
-    (data/to-string (:data (zk/data (:client state) namespaced-key)))))
-
-(defn delete-val
-  [state k]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/delete (:client state) namespaced-key)))
+(load "zookeeper")
 
 (defn create-handler
   [state]
@@ -88,16 +66,9 @@
       wrap-json-response
       wrap-json-body))
 
-(defn connect
-  [hosts & {:keys [root], :or {root "/zookeyper"}}]
-  (let [client (zk/connect hosts)]
-    {:client client
-     :root root}))
-
 (defn -main
   [port hosts]
   (let [state (connect hosts)]
-    (when-not (zk/exists (:client state) (:root state))
-      (zk/create (:client state) (:root state)))
+    (ensure-root-exists-or-create state)
     (println "Listening...")
     (jetty/run-jetty (app state) {:port (Integer. port)})))
