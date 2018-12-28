@@ -5,29 +5,20 @@
             [zookeeper :as zk]
             [cheshire.core :as json]))
 
-(defn with-zookeeper
+(defn with-zookeeper-state
   "Connect to Zookeeper, run the function and then ensure the connection is closed. The
   root znode will be created and then cleaned up after the function is run. This is
   specificly designed to be used in test cases."
   [hosts root f]
-  (let [client (zk/connect hosts)]
-     (try (if (zk/exists client root)
+  (let [state (connect hosts :root root)]
+     (try (if (zk/exists (:client state) (:root state))
             (throw (Exception. "root node already exists"))
             (do
-              (zk/create client root :persistent? true)
-              (f client)))
+              (zk/create (:client state) (:root state) :persistent? true)
+              (f state)))
           (finally
-            (zk/delete-all client root)
-            (zk/close client)))))
-
-(defn with-zookeeper-state
-  "Just like with-zookeeper but upgrades the client to a state object used by the
-  application handlers."
-  [hosts root f]
-  (with-zookeeper hosts root
-    (fn [client]
-      (let [state {:client client :root root}]
-        (f state)))))
+            (zk/delete-all (:client state) (:root state))
+            (zk/close (:client state))))))
 
 (defn with-zookeeper-test
   "Just like with-zookeeper-state but uses the local test zookeeper and the /test root."

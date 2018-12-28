@@ -91,11 +91,13 @@
 (defn connect
   [hosts & {:keys [root], :or {root "/zookeyper"}}]
   (let [client (zk/connect hosts)]
-    (when-not (zk/exists client root) (zk/create client root))
     {:client client
      :root root}))
 
 (defn -main
   [port hosts]
-  (println "Listening...")
-  (jetty/run-jetty (app (connect hosts)) {:port (Integer. port)}))
+  (let [state (connect hosts)]
+    (when-not (zk/exists (:client state) (:root state))
+      (zk/create (:client state) (:root state)))
+    (println "Listening...")
+    (jetty/run-jetty (app state) {:port (Integer. port)})))
