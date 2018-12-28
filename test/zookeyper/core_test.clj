@@ -73,3 +73,24 @@
              (mock-store-request state :put {:key "foo" :val "lol"})))
       (is (= (json-response 200 {:val "lol"})
              (mock-store-request state :get {:key "foo"}))))))
+
+;; Zookeeper Cache Tests
+
+(deftest refresh-cache-detects-zookeeper-changes
+  (with-zookeeper-test
+    (fn [state]
+      (is (empty? @(:cache state)))
+      (create-val state "one" "1")
+      (create-val state "two" "2")
+      (create-val state "three" "3")
+      (refresh-cache-from-zookeeper state)
+      (is (= {"one" "1" "two" "2" "three" "3"} @(:cache state)))
+      (delete-val state "one")
+      (refresh-cache-from-zookeeper state)
+      (is (= {"two" "2" "three" "3"} @(:cache state)))
+      (delete-val state "two")
+      (refresh-cache-from-zookeeper state)
+      (is (= {"three" "3"} @(:cache state)))
+      (delete-val state "three")
+      (refresh-cache-from-zookeeper state)
+      (is (empty? @(:cache state))))))
