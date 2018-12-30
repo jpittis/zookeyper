@@ -95,3 +95,23 @@
       ; Ensure they are received by the watch.
       (Thread/sleep 10)
       (is (= {"three" "3"} @(:cache state))))))
+
+(deftest refresh-cache-watches-for-data-change-events
+  (with-zookeeper-test
+    (fn [state]
+      ; Init a key.
+      (create-val state "counter" "1")
+      (Thread/sleep 10)
+      (is (= {"counter" "1"} @(:cache state)))
+
+      ; Update the key.
+      (update-val state "counter" "2")
+
+      ; Ensure update was received by the watch.
+      (Thread/sleep 10)
+      (is (= {"counter" "2"} @(:cache state)))
+
+      (update-val state "counter" "3")
+
+      (Thread/sleep 10)
+      (is (= {"counter" "3"} @(:cache state))))))

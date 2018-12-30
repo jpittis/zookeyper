@@ -29,6 +29,19 @@
   (let [namespaced-key (namespace-key state k)]
     (zk/delete (:client state) namespaced-key)))
 
+(defn data-watcher
+  "Watches for NodeDataChanged events for keys in the store."
+  [state]
+  (fn [event]
+    (when (= (:event-type event) :NodeDataChanged)
+      (let [path (:path event)
+            k (clojure.string/replace path (str (:root state) "/") "")
+            data (data/to-string
+                   (:data
+                     (zk/data (:client state) path :watcher (data-watcher state))))]
+        (swap! (:cache state) assoc k data)))))
+
+
 (defn children-watcher
   "Watches for NodeChildrenChanged events that signify a new key in the store."
   [state]
@@ -44,7 +57,8 @@
                           {child
                            (data/to-string
                              (:data
-                               (zk/data (:client state) (str (:root state) "/" child))))}))
+                               (zk/data (:client state) (str (:root state) "/" child)
+                                        :watcher (data-watcher state))))}))
                    (into {})
                    (swap! (:cache state) merge)))
             (when-not (empty? deleted-keys)
