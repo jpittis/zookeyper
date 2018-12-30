@@ -15,7 +15,8 @@
   (data/to-string (:data (zk/data (:client state) k :watcher watcher))))
 
 (defn create-val [state k v]
-  (zk/create (:client state) (namespace-key state k) :persistent? true :data (.getBytes v "UTF-8")))
+  (zk/create (:client state) (namespace-key state k)
+             :persistent? true :data (.getBytes v "UTF-8")))
 
 (defn update-val [state k v]
     (zk/set-data (:client state) (namespace-key state k) (.getBytes v "UTF-8") -1))
