@@ -10,30 +10,23 @@
 
 (defn namespace-key [state k] (str (:root state) "/" k))
 
-(defn create-val
-  [state k v]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/create (:client state) namespaced-key :persistent? true :data (.getBytes v "UTF-8"))))
+(defn get-data
+  [state k & {:keys [watcher]}]
+  (data/to-string (:data (zk/data (:client state) k :watcher watcher))))
 
-(defn update-val
-  [state k v]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/set-data (:client state) namespaced-key (.getBytes v "UTF-8") -1)))
+(defn create-val [state k v]
+  (zk/create (:client state) (namespace-key state k) :persistent? true :data (.getBytes v "UTF-8")))
 
-(defn get-val
-  [state k]
+(defn update-val [state k v]
+    (zk/set-data (:client state) (namespace-key state k) (.getBytes v "UTF-8") -1))
+
+(defn get-val [state k]
   (if-let [cached-val (@(:cache state) k)]
     cached-val
-    (let [namespaced-key (namespace-key state k)]
-      ; TODO: A whole bunch of this file is using code similar to this to get values from
-      ; Zookeeper. This should be factored out and the unahppy case where no :data is
-      ; found should be handled.
-      (data/to-string (:data (zk/data (:client state) namespaced-key))))))
+    (get-data state (namespace-key state k))))
 
-(defn delete-val
-  [state k]
-  (let [namespaced-key (namespace-key state k)]
-    (zk/delete (:client state) namespaced-key)))
+(defn delete-val [state k]
+  (zk/delete (:client state) (namespace-key state k)))
 
 (defn data-watcher
   "Watches for NodeDataChanged events for keys in the store."
@@ -42,9 +35,7 @@
     (when (= (:event-type event) :NodeDataChanged)
       (let [path (:path event)
             k (clojure.string/replace path (str (:root state) "/") "")
-            data (data/to-string
-                   (:data
-                     (zk/data (:client state) path :watcher (data-watcher state))))]
+            data (get-data state path :watcher (data-watcher state))]
         (swap! (:cache state) assoc k data)))))
 
 
@@ -60,11 +51,8 @@
             (when-not (empty? created-keys)
               (->> created-keys
                    (map (fn [child]
-                          {child
-                           (data/to-string
-                             (:data
-                               (zk/data (:client state) (str (:root state) "/" child)
-                                        :watcher (data-watcher state))))}))
+                          {child (get-data state (str (:root state) "/" child)
+                                           :watcher (data-watcher state))}))
                    (into {})
                    (swap! (:cache state) merge)))
             (when-not (empty? deleted-keys)
@@ -78,9 +66,8 @@
                   (->> children
                        ; TODO: Possible race if delete happens during map. The easiest fix
                        ; is to have this not raise an exception when a value is not found.
-                       (map (fn [k] {k (data/to-string
-                                         (:data
-                                           (zk/data (:client state) (namespace-key state k))))}))
+                       (map (fn [k] {k (get-data state (namespace-key state k)
+                                                 :watcher (data-watcher state))}))
                        (into {}))
                   ; No children exist so cache is empty.
                   {})]
@@ -89,7 +76,7 @@
 (defn connect
   "Connect wraps a Zookeeper connection into a state object which is then passed around to
   all functions that operate on Zookeeper."
-  [hosts & {:keys [root], :or {root "/zookeyper"}}]
+  [hosts & {:keys [root] :or {root "/zookeyper"}}]
   (let [client (zk/connect hosts)
         state {:client client
                :root root
