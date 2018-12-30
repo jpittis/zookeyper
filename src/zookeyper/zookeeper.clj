@@ -38,6 +38,18 @@
             data (get-data state path :watcher (data-watcher state))]
         (swap! (:cache state) assoc k data)))))
 
+(defn get-children-data [state children]
+  (->> children
+       (map (fn [k]
+              (try
+                {k (get-data state (namespace-key state k) :watcher (data-watcher state))}
+                ; Ignore NoNodeExceptions because another client may have deleted a child
+                ; before we get its data.
+                (catch org.apache.zookeeper.KeeperException$NoNodeException e
+                  nil))))
+       (remove nil?)
+       (into {})))
+
 
 (defn children-watcher
   "Watches for NodeChildrenChanged events that signify a new key in the store."
@@ -49,11 +61,7 @@
                                                   (set (keys @(:cache state))))]
           (do
             (when-not (empty? created-keys)
-              (->> created-keys
-                   (map (fn [child]
-                          {child (get-data state (str (:root state) "/" child)
-                                           :watcher (data-watcher state))}))
-                   (into {})
+              (->> (get-children-data state created-keys)
                    (swap! (:cache state) merge)))
             (when-not (empty? deleted-keys)
               (swap! (:cache state) #(apply dissoc % deleted-keys)))))))))
@@ -63,12 +71,7 @@
   [state]
   (let [children (zk/children (:client state) (:root state) :watcher (children-watcher state))
         updated (if children
-                  (->> children
-                       ; TODO: Possible race if delete happens during map. The easiest fix
-                       ; is to have this not raise an exception when a value is not found.
-                       (map (fn [k] {k (get-data state (namespace-key state k)
-                                                 :watcher (data-watcher state))}))
-                       (into {}))
+                  (get-children-data state children)
                   ; No children exist so cache is empty.
                   {})]
     (reset! (:cache state) updated)))
