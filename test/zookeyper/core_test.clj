@@ -37,6 +37,10 @@
 
 ;; App HTTP Handler Tests
 
+; TODO: I'm using (Thread/sleep 10) to wait for watches to sync. This should likely be
+; replaced with some kind of polling so that the happy path runs fast and the unhappy path
+; fails after a timeout.
+
 (deftest store-get-key-found
   (with-zookeeper-test
     (fn [state]
@@ -68,6 +72,7 @@
              (mock-store-request state :get {:key "foo"})))
       (is (= (json-response 200 {})
              (mock-store-request state :put {:key "foo" :val "lol"})))
+      (Thread/sleep 10)
       (is (= (json-response 200 {:val "lol"})
              (mock-store-request state :get {:key "foo"}))))))
 

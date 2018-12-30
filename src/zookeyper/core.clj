@@ -8,6 +8,8 @@
 
 (load "zookeeper")
 
+; TODO: All these handlers have similar logic. We can probably factor them out.
+
 (defn create-handler
   [state]
   (fn [request]
@@ -67,6 +69,8 @@
       wrap-json-body))
 
 (defn -main
+  ; TODO: Currently we crash with a terrible error message if you don't provide a port and
+  ; a host list. We should probably use some kind of command line flag library.
   [port hosts]
   (let [state (connect hosts)]
     (println "Listening...")

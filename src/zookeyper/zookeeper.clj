@@ -1,6 +1,7 @@
 (ns zookeyper.core
   (:require [zookeeper :as zk]
-            [zookeeper.data :as data]))
+            [zookeeper.data :as data]
+            [clojure.data :refer [diff]]))
 
 (defn ensure-root-exists-or-create
   [state]
@@ -21,8 +22,13 @@
 
 (defn get-val
   [state k]
-  (let [namespaced-key (namespace-key state k)]
-    (data/to-string (:data (zk/data (:client state) namespaced-key)))))
+  (if-let [cached-val (@(:cache state) k)]
+    cached-val
+    (let [namespaced-key (namespace-key state k)]
+      ; TODO: A whole bunch of this file is using code similar to this to get values from
+      ; Zookeeper. This should be factored out and the unahppy case where no :data is
+      ; found should be handled.
+      (data/to-string (:data (zk/data (:client state) namespaced-key))))))
 
 (defn delete-val
   [state k]
@@ -48,8 +54,8 @@
   (fn [event]
     (let [children (zk/children (:client state) (:root state) :watcher (children-watcher state))]
       (when (= (:event-type event) :NodeChildrenChanged)
-        (let [[created-keys deleted-keys _] (clojure.data/diff (set children)
-                                                               (set (keys @(:cache state))))]
+        (let [[created-keys deleted-keys _] (diff (set children)
+                                                  (set (keys @(:cache state))))]
           (do
             (when-not (empty? created-keys)
               (->> created-keys
@@ -70,10 +76,11 @@
   (let [children (zk/children (:client state) (:root state) :watcher (children-watcher state))
         updated (if children
                   (->> children
-                       ; TODO: Possible race if delete happens during map.
-                       ; TODO: Probably shouldn't use get-val because I'm going to add
-                       ; caching at that layer. Maybe a no-cache flag?
-                       (map (fn [k] {k (get-val state k)}))
+                       ; TODO: Possible race if delete happens during map. The easiest fix
+                       ; is to have this not raise an exception when a value is not found.
+                       (map (fn [k] {k (data/to-string
+                                         (:data
+                                           (zk/data (:client state) (namespace-key state k))))}))
                        (into {}))
                   ; No children exist so cache is empty.
                   {})]
