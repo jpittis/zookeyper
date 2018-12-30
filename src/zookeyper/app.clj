@@ -4,53 +4,44 @@
             [ring.middleware.json :refer [wrap-json-response wrap-json-body]]
             [ring.util.response :refer [response]]))
 
-; TODO: All these handlers have similar logic. We can probably factor them out.
+(defn exception-to-status [e]
+  (cond
+    (= (type e) org.apache.zookeeper.KeeperException$NoNodeException) 404
+    :else 500))
 
-(defn create-handler
-  [state]
+(defn exceptions-to-json [handler]
   (fn [request]
     (try
-      (let [k ((:body request) "key")
-            v ((:body request) "val")]
-        (do (create-val state k v)
-            (response {})))
+      (handler request)
       (catch Exception e
         (-> (response {:error (.getMessage e)})
-            (assoc :status 404))))))
+            (assoc :status (exception-to-status e)))))))
 
-(defn update-handler
-  [state]
+(defn create-handler [state]
   (fn [request]
-    (try
-      (let [k ((:body request) "key")
-            v ((:body request) "val")]
-        (do (update-val state k v)
-            (response {})))
-      (catch Exception e
-        (-> (response {:error (.getMessage e)})
-            (assoc :status 404))))))
+    (let [k ((:body request) "key")
+          v ((:body request) "val")]
+      (create-val state k v)
+      (response {}))))
 
-(defn delete-handler
-  [state]
+(defn update-handler [state]
   (fn [request]
-    (try
-      (let [k ((:body request) "key")
-            v (delete-val state k)]
-        (response {}))
-      (catch Exception e
-        (-> (response {:error (.getMessage e)})
-            (assoc :status 404))))))
+    (let [k ((:body request) "key")
+          v ((:body request) "val")]
+      (update-val state k v)
+      (response {}))))
 
-(defn get-handler
-  [state]
+(defn delete-handler [state]
   (fn [request]
-    (try
-      (let [k ((:body request) "key")
-            v (get-val state k)]
-        (response {:val v}))
-      (catch Exception e
-        (-> (response {:error (.getMessage e)})
-            (assoc :status 404))))))
+    (let [k ((:body request) "key")
+          v (delete-val state k)]
+      (response {}))))
+
+(defn get-handler [state]
+  (fn [request]
+    (let [k ((:body request) "key")
+          v (get-val state k)]
+      (response {:val v}))))
 
 (defn routes [state]
   (compojure.core/routes
@@ -61,5 +52,6 @@
 
 (defn app [state]
   (-> (routes state)
+      exceptions-to-json
       wrap-json-response
       wrap-json-body))
