@@ -1,5 +1,5 @@
 (defproject zookeyper "0.1.0"
-  :description "A caching key value store on top of Zookeeper."
+  :description "A simple HTTP based write though key value cache built on top of Zookeeper."
   :dependencies [[org.clojure/clojure "1.10.0"]
                  [ring/ring-core "1.7.1"]
                  [ring/ring-jetty-adapter "1.7.1"]
