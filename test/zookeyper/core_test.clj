@@ -35,11 +35,26 @@
    :headers {"Content-Type" "application/json; charset=utf-8"}
    :body (json/generate-string body)})
 
-;; App HTTP Handler Tests
+; TODO: This is a kinda super sketch function. Likely this should be a macro and make
+; better use of some existing testing API."
+(defn wait-cache-equal
+  "Polls the cache until it equals the wanted state or the loop hits a timeout. This is
+  useful for tests to run fast on their success path and slow when hitting the timeout on
+  the failure path."
+  [state wanted & {:keys [attempts max-attempts sleep-ms]
+                   :or {attempts 0 max-attempts 3 sleep-ms 10}}]
+  (if (= wanted @(:cache state))
+    ; Use is to double validate the success so we record an assertion.
+    (is (= wanted @(:cache state)))
+    (if (< attempts max-attempts)
+      (do (Thread/sleep sleep-ms) (wait-cache-equal state wanted
+                                                    :attempts (inc attempts)
+                                                    :max-attempts max-attempts
+                                                    :sleep-ms sleep-ms))
+      ; Use is to double validate the output so we get a nice error message.
+      (is (= wanted @(:cache state))))))
 
-; TODO: I'm using (Thread/sleep 10) to wait for watches to sync. This should likely be
-; replaced with some kind of polling so that the happy path runs fast and the unhappy path
-; fails after a timeout.
+;; App HTTP Handler Tests
 
 (deftest store-get-key-found
   (with-zookeeper-test
@@ -72,7 +87,7 @@
              (mock-store-request state :get {:key "foo"})))
       (is (= (json-response 200 {})
              (mock-store-request state :put {:key "foo" :val "lol"})))
-      (Thread/sleep 10)
+      (wait-cache-equal state {"foo" "lol"})
       (is (= (json-response 200 {:val "lol"})
              (mock-store-request state :get {:key "foo"}))))))
 
@@ -81,42 +96,25 @@
 (deftest refresh-cache-watches-for-child-create-and-delete-events
   (with-zookeeper-test
     (fn [state]
-      ; Cache should be empty before fetching from Zookeeper.
       (is (empty? @(:cache state)))
 
-      ; Add three key value pairs.
       (create-val state "one" "1")
       (create-val state "two" "2")
       (create-val state "three" "3")
+      (wait-cache-equal state {"one" "1" "two" "2" "three" "3"})
 
-      ; Ensure they are received by the watch.
-      (Thread/sleep 10)
-      (is (= {"one" "1" "two" "2" "three" "3"} @(:cache state)))
-
-      ; Delete two of the key value pairs.
       (delete-val state "one")
       (delete-val state "two")
-
-      ; Ensure they are received by the watch.
-      (Thread/sleep 10)
-      (is (= {"three" "3"} @(:cache state))))))
+      (wait-cache-equal state {"three" "3"}))))
 
 (deftest refresh-cache-watches-for-data-change-events
   (with-zookeeper-test
     (fn [state]
-      ; Init a key.
       (create-val state "counter" "1")
-      (Thread/sleep 10)
-      (is (= {"counter" "1"} @(:cache state)))
+      (wait-cache-equal state {"counter" "1"})
 
-      ; Update the key.
       (update-val state "counter" "2")
-
-      ; Ensure update was received by the watch.
-      (Thread/sleep 10)
-      (is (= {"counter" "2"} @(:cache state)))
+      (wait-cache-equal state {"counter" "2"})
 
       (update-val state "counter" "3")
-
-      (Thread/sleep 10)
-      (is (= {"counter" "3"} @(:cache state))))))
+      (wait-cache-equal state {"counter" "3"}))))
