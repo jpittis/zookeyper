@@ -69,6 +69,5 @@
 (defn -main
   [port hosts]
   (let [state (connect hosts)]
-    (ensure-root-exists-or-create state)
     (println "Listening...")
     (jetty/run-jetty (app state) {:port (Integer. port)})))

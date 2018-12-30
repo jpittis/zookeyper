@@ -13,14 +13,11 @@
   specificly designed to be used in test cases."
   [hosts root f]
   (let [state (connect hosts :root root)]
-     (try (if (zk/exists (:client state) (:root state))
-            (throw (Exception. "root node already exists"))
-            (do
-              (zk/create (:client state) (:root state) :persistent? true)
-              (f state)))
-          (finally
-            (zk/delete-all (:client state) (:root state))
-            (zk/close (:client state))))))
+    (try
+      (f state)
+      (finally
+        (zk/delete-all (:client state) (:root state))
+        (zk/close (:client state))))))
 
 (defn with-zookeeper-test
   "Just like with-zookeeper-state but uses the local test zookeeper and the /test root."
@@ -76,21 +73,25 @@
 
 ;; Zookeeper Cache Tests
 
-(deftest refresh-cache-detects-zookeeper-changes
+(deftest refresh-cache-watches-for-child-create-and-delete-events
   (with-zookeeper-test
     (fn [state]
+      ; Cache should be empty before fetching from Zookeeper.
       (is (empty? @(:cache state)))
+
+      ; Add three key value pairs.
       (create-val state "one" "1")
       (create-val state "two" "2")
       (create-val state "three" "3")
-      (refresh-cache-from-zookeeper state)
+
+      ; Ensure they are received by the watch.
+      (Thread/sleep 10)
       (is (= {"one" "1" "two" "2" "three" "3"} @(:cache state)))
+
+      ; Delete two of the key value pairs.
       (delete-val state "one")
-      (refresh-cache-from-zookeeper state)
-      (is (= {"two" "2" "three" "3"} @(:cache state)))
       (delete-val state "two")
-      (refresh-cache-from-zookeeper state)
-      (is (= {"three" "3"} @(:cache state)))
-      (delete-val state "three")
-      (refresh-cache-from-zookeeper state)
-      (is (empty? @(:cache state))))))
+
+      ; Ensure they are received by the watch.
+      (Thread/sleep 10)
+      (is (= {"three" "3"} @(:cache state))))))
