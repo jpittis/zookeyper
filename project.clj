@@ -8,6 +8,8 @@
                  [zookeeper-clj "0.9.4"]
                  [ring/ring-json "0.4.0"]
                  [cheshire "5.8.1"]]
+  :license {:name "The MIT License"
+            :url "https://opensource.org/licenses/MIT"}
   :main ^:skip-aot zookeyper.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
