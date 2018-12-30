@@ -5,7 +5,7 @@
             [zookeeper :as zk]
             [cheshire.core :as json]))
 
-;; Test Helpers
+; Test Helpers
 
 (defn with-zookeeper-state
   "Connect to Zookeeper, run the function and then ensure the connection is closed. The
@@ -54,7 +54,7 @@
       ; Use is to double validate the output so we get a nice error message.
       (is (= wanted @(:cache state))))))
 
-;; App HTTP Handler Tests
+; App HTTP Handler Tests
 
 (deftest store-get-key-found
   (with-zookeeper-test
@@ -91,7 +91,7 @@
       (is (= (json-response 200 {:val "lol"})
              (mock-store-request state :get {:key "foo"}))))))
 
-;; Zookeeper Cache Tests
+; Zookeeper Cache Tests
 
 (deftest refresh-cache-watches-for-child-create-and-delete-events
   (with-zookeeper-test
