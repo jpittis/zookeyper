@@ -7,7 +7,8 @@
                  [ring/ring-mock "0.3.2"]
                  [zookeeper-clj "0.9.4"]
                  [ring/ring-json "0.4.0"]
-                 [cheshire "5.8.1"]]
+                 [cheshire "5.8.1"]
+                 [org.clojure/tools.cli "0.4.1"]]
   :license {:name "The MIT License"
             :url "https://opensource.org/licenses/MIT"}
   :main ^:skip-aot zookeyper.core
